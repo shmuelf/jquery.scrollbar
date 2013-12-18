@@ -1,5 +1,4 @@
 
-
 /****************************************************************************
     jQuery pluggin scrollbar, adds scroll bar for a container element.
 
@@ -11,10 +10,10 @@
 **  usage: $(domElement).scrollbar(axis, options);
 **  adds scroll bar to domElement that is a container of elements
 **  @requires jquery.event.drag.js
-**  @requires jquery.ui.js (as a css source)
+**  @optional jquery.mousewheel.js
 
 **  $(domElement).scrollbar have this parameters:
-**      0. domElement - a container element that have content bigger than his size and have overflow != 'none'
+**      0. domElement - a container element that have content bigger than his size
 **      1. axis - 'x' for horizontal scroller, or 'y' for vertical ['y' is default]
 **      2. parameter 2 [optional] can be options object that include the following properties
 **              scrollerWraper - dom element or element selector to hold ths scroller.
