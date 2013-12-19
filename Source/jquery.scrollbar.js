@@ -454,6 +454,26 @@
                 numOfItemsBefore = 0;
                 setItemsToDisplay(itemSize);
                 //$container.bind('scrolled.scrollbar', hideShowElements);
+                prepareShowHideActions();
+            }
+
+            function prepareShowHideActions() {
+                if (!options.scrolledItemInitializers) {
+                    hideItems = function (selector) {
+                        return trs.filter(selector).addClass('scrolledOutOfView');
+                    }
+                    showItems = function (selector) {
+                        return trs.filter(selector).removeClass('scrolledOutOfView');
+                    }
+                }
+                else {
+                    hideItems = function (selector) {
+                        return trs.filter(selector).each(options.scrolledItemInitializers.dispose).addClass('scrolledOutOfView');
+                    }
+                    showItems = function (selector) {
+                        return trs.filter(selector).each(options.scrolledItemInitializers.init).removeClass('scrolledOutOfView');
+                    }
+                }
             }
 
             function setItemsToDisplay(_itemSize) {
@@ -619,18 +639,20 @@
                     numOfItemsBefore = 0;
                 //console.log('setNumberOfItemsBefore ' + numOfItemsBefore);
                 if (numOfItemsBefore > 0) {
-                    trs.filter(':lt(' + numOfItemsBefore + ')').addClass('scrolledOutOfView');
-                    ret = trs.filter(':gt(' + (numOfItemsBefore - 1) + '):lt(' + itemsToDisplay + ')').removeClass('scrolledOutOfView');
-                    trs.filter(':gt(' + (numOfItemsBefore + itemsToDisplay - 1) + ')').addClass('scrolledOutOfView');
+                    hideItems/*trs.filter*/(':lt(' + numOfItemsBefore + ')');//.addClass('scrolledOutOfView');
+                    ret = showItems/*trs.filter*/(':gt(' + (numOfItemsBefore - 1) + '):lt(' + itemsToDisplay + ')');//.removeClass('scrolledOutOfView');
+                    hideItems/*trs.filter*/(':gt(' + (numOfItemsBefore + itemsToDisplay - 1) + ')')//.addClass('scrolledOutOfView');
                 }
                 else {
-                    ret = trs.filter(':lt(' + itemsToDisplay + ')').removeClass('scrolledOutOfView');
-                    trs.filter(':gt(' + (itemsToDisplay - 1) + ')').addClass('scrolledOutOfView');
+                    ret = showItems/*trs.filter*/(':lt(' + itemsToDisplay + ')')//.removeClass('scrolledOutOfView');
+                    hideItems/*trs.filter*/(':gt(' + (itemsToDisplay - 1) + ')')//.addClass('scrolledOutOfView');
                 }
                 return ret;
                 //setNumberOfItemsBefore(parseInt((e.scrollerPos / e.scrollerSize) * (trs.length - itemsToDisplay)) - 1); //parseInt(((containerPos + 1) / (itemHeight + 1)));
             }
 
+            var hideItems,
+                showItems;
             
             //function removeAllOutOfViewClasses() {
 
