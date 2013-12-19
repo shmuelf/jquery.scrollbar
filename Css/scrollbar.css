@@ -30,6 +30,7 @@ body .ui-scroller-vertical {
 body .ui-scroller-vertical .ui-slider-handle {
 left: 0px;
 width: 12px;
+position: absolute;
 }
 body .ui-scroller-horizontal {
 	height: 12px;
@@ -37,4 +38,7 @@ body .ui-scroller-horizontal {
 body .ui-scroller-horizontal .ui-slider-handle {
 top: 0px;
 height: 12px;
+}
+body .scrolledOutOfView {
+	display: none;
 }
