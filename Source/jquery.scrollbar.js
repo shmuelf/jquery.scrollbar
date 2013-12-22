@@ -2,7 +2,7 @@
 /****************************************************************************
     jQuery pluggin scrollbar, adds scroll bar for a container element.
 
-**  @author Shmuel Friedman. smulak@gmail.com
+**  @author Shmuel Friedman. shmuel.friedman3@gmail.com
 **  @date: 10/10/12
 
 **  some inspiration gotten from Andrew Lowndes http://www.aplweb.co.uk/blog/js/scrollbars-v2/ pluggin
@@ -228,6 +228,11 @@
                 if (!$container.is(':visible'))
                     return;
                 scrollContainerAndScroller(dd.origPos + dd['delta' + coord]);
+            }
+            function scrollerDraggableDrag(e, dd) {
+                if (!$container.is(':visible'))
+                    return;
+                scrollContainerAndScroller(dd.originalPosition[dir] + dd.offset[dir]); 
             }
             function scrollerDragEnd() {
                 //$container.trigger('scrollend.scrollbar');
@@ -659,11 +664,25 @@
             //    $('.t-grid-content .scrolledOutOfView').removeClass('scrolledOutOfView');
             //}
 
+            function bindDrag() {
+                if ($slider.drag)
+                    $slider.drag("start", scrollerDragStart)
+                           .drag(scrollerDrag)
+                           .drag('end', scrollerDragEnd);
+                else if ($slider.draggable) {
+                    $slider.draggable({
+                        //start: scrollerDragStart,
+                        drag: scrollerDraggableDrag,
+                        stop: scrollerDragEnd,
+                        containment: $scrollerWraper,
+                        axis: axis
+                    });
+                }
+            }
+
             function bindEvents() {
                 // for dragging the slider:
-                $slider.drag("start", scrollerDragStart)
-                       .drag(scrollerDrag)
-                       .drag('end', scrollerDragEnd);
+                bindDrag()
 
                 // for clicking on the scroll area, jumps the slider to the clicked point:
                 $scrollerWraper.mousedown(scrollAreaMouseDown);
