@@ -136,7 +136,7 @@
             this.destroy = destroy;
             this.scroller = null;
             this.refreshItemsSelector = refreshItemsSelector;
-            this.getItems = function () { return trs; };
+            this.getItems = function () { return items; };
 
             fillFromClasses(options, $container, ['multiContainerScroller', 'manualPosition', 'resizeable']);
 
@@ -211,12 +211,11 @@
             }
 
             function setContainerPos() {
-                var $this = $(this);
-                var currScrollArea = getScrollArea($this);
-                var newScrollPos = (newPos / maxPos) * (currScrollArea - $this[size]());
+                var newScrollPos = containerScroll.fromScrollerPos($(this));
                 this[scrollPos] = newScrollPos;
                 //$this.trigger('scrolled.scrollbar', [{ scrollerPos: newPos, scrollerSize: maxPos, containerPos: newScrollPos, containerSize: $this[size](), continerScrollSize: currScrollArea, dir: axis }]);
             }
+            
             // --------------------- local Events: ----------------------- //
             function scrollerDragStart(e, dd) {
                 if (!$container.is(':visible'))
@@ -242,7 +241,7 @@
                 if (!$container.is(':visible'))
                     return;
                 $container.trigger('scrolling.scrollbar')
-                scrollContainerAndScroller(e['page' + coord] - $(this).offset()[dir] - ($slider[size]() / 2.0));
+                scrollContainerAndScroller(e['page' + coord] - $scrollerWraper.offset()[dir] - ($slider[size]() / 2.0));
                 $container.trigger('scrollend.scrollbar');
             }
 
@@ -298,7 +297,27 @@
                         $container.unbind('mousewheel', containerMouseWheal);
                 }
             }
-
+            var scrollRatio = {
+                fromWheelStep: function (delta) {
+                    return -(delta * 30) / getScrollArea($(container));
+                },
+                fromContainerPos: function () {
+                    return container[scrollPos] / (getScrollArea($(container)) - $container[size]())
+                },
+                fromVirtualScroll: function () {
+                    return (numOfItemsBefore * itemSize + container[scrollPos]) / (getScrollArea($(container)) - $container[size]());
+                }
+            };
+            var containerScroll = {
+                fromScrollerPos: function ($cont) {
+                    return (newPos / maxPos) * (getScrollArea($cont) - $cont[size]());
+                },
+                toScrollRatio: scrollRatio.fromContainerPos
+            };
+            var scrollerPos = {
+                toContainerScroll: containerScroll.fromScrollerPos/*,
+                toVirtualScroll: virtualScroll.fromScrollerPos*/
+            };
             function setScrollerSize(currScrollArea, containerSpace) {
                 var scrollerSpace = ($scrollerWraper[size]() / currScrollArea) * containerSpace/* / stepSize*/;
 
@@ -307,21 +326,14 @@
                     newSize = 5;
                 $slider[size](newSize);
             }
-
+            
             function scrollScrollerByContainer() {
-                //var pos = $container[scrollPos]() / (container[scrollSize] - $container[size]());
-                var pos;
-                if (options.virtualScroll)
-                    pos = (numOfItemsBefore * itemSize + container[scrollPos]) / (getScrollArea($(container)) - $container[size]()); //numOfItemsBefore / trs.length;
-                else if (options.fixedScrollSize)
-                    pos = parseInt($slider.css(dir).replace('px', '')) / ($scrollerWraper[size]() - $slider[size]());
-                else
-                    pos = container[scrollPos] / (getScrollArea($(container)) - $container[size]());
-                if (isNaN(pos)) pos = 0;
+                var pos = currentScrollRatio();
                 scrollScroller(pos, false);
                 //$container[scrollPos] * maxPos / (container[scrollSize] - $container[size]());
                 return { scrollerPos: newPos * maxPos, scrollerSize: maxPos };
             }
+            
             function containerMouseWheal(e, delta) { // TODO: correlate this with scrollContainerAndScroller
                 $container.trigger('scrolling.scrollbar')
                 /*//$container.scrollTop($container.scrollTop() - (delta * 30));
@@ -338,12 +350,19 @@
                     $this.trigger('scrolled.scrollbar', [$.extend(e, { containerPos: this.scrollTop, containerSize: $this[size](), continerScrollSize: getScrollArea($this) })]);
                 });*/
                 selectContainer();
-                Step(-(delta * 30) / getScrollArea($(container)));
+                Step(scrollRatio.fromWheelStep(delta));
                 return true;
             }
 
-            var Step = this.Step = function (step) {
-                return scrollContainerAndScroller(step, true);
+            var Step = this.Step = function (step, moveTo) {
+                var pos = step;
+                if (moveTo) {
+                    var cont = {};
+                    if (!preScrollerUpdate(null, null, cont))
+                        return;
+                    pos = (pos / cont.containerSpace) * ($scrollerWraper[size]() - $slider[size]())
+                }
+                return scrollContainerAndScroller(pos, !moveTo);
             }
 
             function containerMouseWhealEnd() {
@@ -425,7 +444,7 @@
             // VIRTUAL SCROLL //
             //----------------//
             var virtualScrollInitialized,
-                trs,
+                items,
                 itemsFilter,
                 itemSize,
                 numOfItemsBefore = 0,
@@ -433,6 +452,27 @@
                 scrollSpace = 20,
                 prevState;
 
+            that.currentScrollPos = currentScrollPos;
+            function currentScrollPos() {
+                return currentScrollRatio() * getScrollArea();
+            }
+            // returns item index out of point (actual x or y coordinate (accordin to dir of the scrollbar) on the container)
+            that.findItem = findItem;
+            function findItem(point) {
+                return numOfItemsBefore + parseInt((container[scrollPos] + point) / itemSize);
+            }
+            function currentScrollRatio() {
+                //var pos = $container[scrollPos]() / (container[scrollSize] - $container[size]());
+                var pos;
+                if (options.virtualScroll)
+                    pos = scrollRatio.fromVirtualScroll(); //numOfItemsBefore / items.length;
+                else if (options.fixedScrollSize)
+                    pos = parseInt($slider.css(dir).replace('px', '')) / ($scrollerWraper[size]() - $slider[size]());
+                else
+                    pos = scrollRatio.fromContainerPos();
+                if (isNaN(pos)) pos = 0;
+                return pos;
+            }
             function getScrollerPosition() {
                 var ret = $slider.css(dir).replace('px', '');
                 if (ret.indexOf('%') > 0)
@@ -465,18 +505,18 @@
             function prepareShowHideActions() {
                 if (!options.scrolledItemInitializers) {
                     hideItems = function (selector) {
-                        return trs.filter(selector).addClass('scrolledOutOfView');
+                        return items.filter(selector).addClass('scrolledOutOfView');
                     }
                     showItems = function (selector) {
-                        return trs.filter(selector).removeClass('scrolledOutOfView');
+                        return items.filter(selector).removeClass('scrolledOutOfView');
                     }
                 }
                 else {
                     hideItems = function (selector) {
-                        return trs.filter(selector).each(options.scrolledItemInitializers.dispose).addClass('scrolledOutOfView');
+                        return items.filter(selector).each(options.scrolledItemInitializers.dispose).addClass('scrolledOutOfView');
                     }
                     showItems = function (selector) {
-                        return trs.filter(selector).each(options.scrolledItemInitializers.init).removeClass('scrolledOutOfView');
+                        return items.filter(selector).each(options.scrolledItemInitializers.init).removeClass('scrolledOutOfView');
                     }
                 }
             }
@@ -488,7 +528,7 @@
                     itemsToDisplay = itemsToDisplay + 2;*/
                 var tmp = (2 * itemSize + $container[size]()) / itemSize;
                 itemsToDisplay = (tmp - parseInt(tmp)) > 0 ? parseInt(tmp) + 1 : tmp;
-                /*var L = (trs ? trs : $container.find(itemsFilter)).length;
+                /*var L = (items ? items : $container.find(itemsFilter)).length;
                 if (itemsToDisplay > L) itemsToDisplay = L;*/
             }
 
@@ -505,15 +545,15 @@
             function fixDynamicScroller(isNewSelector) {
                 //$('.t-grid-content .scrolledOutOfView').removeClass('scrolledOutOfView');
                 //$('.t-grid-content').scrollbar('y', 'update');
-                //trs = $('.t-grid-content tr:visible');
+                //items = $('.t-grid-content tr:visible');
                 var oldLength;
                 if (!isNewSelector)
-                    oldLength = trs ? trs.length : 0;
+                    oldLength = items ? items.length : 0;
                 applyItemsFilter(isNewSelector);
                 if (isNewSelector)
-                    updateScroller(true, { scrollSize: trs.length * itemSize });
+                    updateScroller(true, { scrollSize: items.length * itemSize });
                 else {
-                    number = trs.length - oldLength;
+                    number = items.length - oldLength;
                     var itemsSize = number * itemSize;
 
                     updateScroller(true, { addToScrollSize: itemsSize });
@@ -523,10 +563,10 @@
             function applyItemsFilter(isNewSelector) {
                 
                 var inactiveTrs;
-                if (trs && isNewSelector)
-                    inactiveTrs = trs.filter(':not(.scrolledOutOfView):not(' + itemsFilter + ')');
+                if (items && isNewSelector)
+                    inactiveTrs = items.filter(':not(.scrolledOutOfView):not(' + itemsFilter + ')');
                 prevState = null;
-                trs = $container.find(itemsFilter);
+                items = $container.find(itemsFilter);
                 //if (preScrollerUpdate(updateScrollSize, scrollAreaParams, {})) {
                 if (inactiveTrs)
                     inactiveTrs.addClass('scrolledOutOfView');
@@ -537,7 +577,56 @@
                     setItemsToDisplay(itemSize);
                 }
             }
+
+            var virtualScroll = {
+                toScrollRatio: scrollRatio.fromVirtualScroll,
+                posFromRatio: function(ratio, containerSize, virtualScrollArea) {
+                    return parseInt(ratio * (virtualScrollArea - containerSize))
+                },
+                // ret: {containerPosRelative, containerPos, newNumOfItemsBefore}
+                fromScrollerPos: function (pos, containerSize, virtualScrollArea) {
+                    var s1 = this.posFromRatio(pos / maxPos, containerSize, virtualScrollArea);
+                    //var s1 = parseInt((pos / maxPos) * (virtualScrollArea - containerSize));
+                    return this.fromVirtualPos(s1);
+                },
+                fromVirtualPos: function (s1) {
+                    var ret = {};
+                    if (s1 == 0)
+                        ret.containerPos = ret.newNumOfItemsBefore = 0;
+                    else {
+                        var d1;
+                        var ib = s1 / itemSize;
+                        d1 = Math.round((ib - parseInt(ib)) * itemSize);
+                        ib = parseInt(ib);
+                        //var d2 = (s1 + e1.containerSize) / itemSize; d2 = itemSize + parseInt(d2) - d2;
+
+                        if (d1 == 0) {
+                            ib -= 1;
+                            d1 += itemSize;
+                        }
+                        if (ib < 0)
+                            ib == 0;
+                        var diff = (ib + itemsToDisplay) - items.length;
+                        if (diff > 0) {
+                            ib -= diff;
+                            d1 += itemSize * diff;
+                        }
+                        if (items.length == itemsToDisplay)
+                            ib = 0;
+                        /*if ((d1 - e1.containerSize) >= actualScrollArea) {
+                            ib += 1;
+                            d1 -= itemSize;
+                        }*/
+                        ret.containerPosRelative = d1;
+                        ret.containerPos = s1;
+                        ret.newNumOfItemsBefore = ib;
+                    }
+                    return ret;
+                }
+            };
             
+            
+
             function setContainerPosVirtual() {
                 var $this = $(this);
                 var virtualScrollArea = getScrollArea($this);
@@ -545,40 +634,14 @@
                 //var newScrollPos = (newPos / maxPos) * (virtualScrollArea - $this[size]());
                 var e1 = { scrollerPos: newPos, scrollerSize: maxPos, containerSize: $this[size](), continerScrollSize: virtualScrollArea, dir: axis };
 
-                var d1;
-                if (newPos == 0)
-                    e1.containerPos = e1.newNumOfItemsBefore = 0;
-                else {
-                    var s1 = parseInt((newPos / maxPos) * (virtualScrollArea - e1.containerSize));
-                    var ib = s1 / itemSize; 
-                    d1 = Math.round((ib - parseInt(ib)) * itemSize); 
-                    ib = parseInt(ib);
-                    //var d2 = (s1 + e1.containerSize) / itemSize; d2 = itemSize + parseInt(d2) - d2;
+                var pos = virtualScroll.fromScrollerPos(newPos, e1.containerSize, virtualScrollArea);
+                e1.containerPos = pos.containerPos;
+                e1.newNumOfItemsBefore = pos.newNumOfItemsBefore;
 
-                    if (d1 == 0) {
-                        ib -= 1;
-                        d1 += itemSize;
-                    }
-                    if (ib < 0)
-                        ib == 0;
-                    var diff = (ib + itemsToDisplay) - trs.length;
-                    if (diff > 0) {
-                        ib -= diff;
-                        d1 += itemSize * diff;
-                    }
-                    if (trs.length == itemsToDisplay)
-                        ib = 0;
-                    /*if ((d1 - e1.containerSize) >= actualScrollArea) {
-                        ib += 1;
-                        d1 -= itemSize;
-                    }*/
-                    e1.containerPos = s1;
-                    e1.newNumOfItemsBefore = ib;
-                }
                 hideShowElements(null, e1);
-                this[scrollPos] = d1;
+                this[scrollPos] = pos.containerPosRelative;
                 //$this.trigger('scrolled.scrollbar', [e1]);
-                //$('#shmuel').text('ib:' + ib + ', s1:' + s1 + ', d1:' + d1 + ', sp:' + this[scrollPos] + ', ss:' + actualScrollArea+ ', itd:' + trs.filter(':visible').length);
+                //$('#shmuel').text('ib:' + ib + ', s1:' + s1 + ', d1:' + d1 + ', sp:' + this[scrollPos] + ', ss:' + actualScrollArea+ ', itd:' + items.filter(':visible').length);
                 /*var newScrollPos = (newPos / maxPos) * (virtualScrollArea - e1.containerSize);
                 var tmp = parseInt(newScrollPos / itemSize);
                 var newNum = null;
@@ -644,16 +707,16 @@
                     numOfItemsBefore = 0;
                 //console.log('setNumberOfItemsBefore ' + numOfItemsBefore);
                 if (numOfItemsBefore > 0) {
-                    hideItems/*trs.filter*/(':lt(' + numOfItemsBefore + ')');//.addClass('scrolledOutOfView');
-                    ret = showItems/*trs.filter*/(':gt(' + (numOfItemsBefore - 1) + '):lt(' + itemsToDisplay + ')');//.removeClass('scrolledOutOfView');
-                    hideItems/*trs.filter*/(':gt(' + (numOfItemsBefore + itemsToDisplay - 1) + ')')//.addClass('scrolledOutOfView');
+                    hideItems/*items.filter*/(':lt(' + numOfItemsBefore + ')');//.addClass('scrolledOutOfView');
+                    ret = showItems/*items.filter*/(':gt(' + (numOfItemsBefore - 1) + '):lt(' + itemsToDisplay + ')');//.removeClass('scrolledOutOfView');
+                    hideItems/*items.filter*/(':gt(' + (numOfItemsBefore + itemsToDisplay - 1) + ')')//.addClass('scrolledOutOfView');
                 }
                 else {
-                    ret = showItems/*trs.filter*/(':lt(' + itemsToDisplay + ')')//.removeClass('scrolledOutOfView');
-                    hideItems/*trs.filter*/(':gt(' + (itemsToDisplay - 1) + ')')//.addClass('scrolledOutOfView');
+                    ret = showItems/*items.filter*/(':lt(' + itemsToDisplay + ')')//.removeClass('scrolledOutOfView');
+                    hideItems/*items.filter*/(':gt(' + (itemsToDisplay - 1) + ')')//.addClass('scrolledOutOfView');
                 }
                 return ret;
-                //setNumberOfItemsBefore(parseInt((e.scrollerPos / e.scrollerSize) * (trs.length - itemsToDisplay)) - 1); //parseInt(((containerPos + 1) / (itemHeight + 1)));
+                //setNumberOfItemsBefore(parseInt((e.scrollerPos / e.scrollerSize) * (items.length - itemsToDisplay)) - 1); //parseInt(((containerPos + 1) / (itemHeight + 1)));
             }
 
             var hideItems,
@@ -680,6 +743,15 @@
                 }
             }
 
+            function unbindDrag() {
+                if ($slider.drag) {
+                    $slider.unbind('dragstart', scrollerDragStart);
+                    $slider.unbind('drag', scrollerDrag);
+                }
+                else 
+                    $slider.draggable('destroy');
+            }
+
             function bindEvents() {
                 // for dragging the slider:
                 bindDrag()
@@ -689,7 +761,7 @@
 
                 //allow the mouse wheel to scroll the content
                 if (axis == 'y')
-                    onEventEnd($container, 'mousewheel', containerMouseWhealEnd, containerMouseWheal);
+                    onEventEnd($container, 'mousewheel.scrollbar', containerMouseWhealEnd, containerMouseWheal);
 
                 // update scrollers
                 $container.resize(updateScroller);
@@ -704,11 +776,10 @@
             }
 
             function unbindEvents() {
-                $slider.unbind('dragstart', scrollerDragStart);
-                $slider.unbind('drag', scrollerDrag);
+                unbindDrag();
                 $scrollerWraper.unbind('mousedown', scrollAreaMouseDown)
                 if (axis == 'y')
-                    $container.unbind('mousewheel', containerMouseWheal);
+                    $container.unbind('mousewheel.scrollbar');
                 $container.unbind('resize', updateScroller);
                 /*if (virtualScrollInitialized)
                     $container.unbind('scrolled.scrollbar', hideShowElements);*/
