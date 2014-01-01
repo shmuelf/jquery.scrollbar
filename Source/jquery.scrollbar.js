@@ -484,6 +484,7 @@
                 e.scrollerSize = $scrollerWraper[size]() - $slider[size]();
                 e.scrollerPos = getScrollerPosition();
                 e.newNumOfItemsBefore = numOfItemsBefore;
+                e.end = numOfItemsBefore + itemsToDisplay - 1;
                 return e;
             }
 
@@ -513,10 +514,10 @@
                 }
                 else {
                     hideItems = function (selector) {
-                        return items.filter(selector).each(options.scrolledItemInitializers.dispose).addClass('scrolledOutOfView');
+                        return items.filter(selector).addClass('scrolledOutOfView').each(options.scrolledItemInitializers.dispose);
                     }
                     showItems = function (selector) {
-                        return items.filter(selector).each(options.scrolledItemInitializers.init).removeClass('scrolledOutOfView');
+                        return items.filter(selector).removeClass('scrolledOutOfView').each(options.scrolledItemInitializers.init);
                     }
                 }
             }
@@ -591,7 +592,7 @@
                 },
                 fromVirtualPos: function (s1) {
                     var ret = {};
-                    if (s1 == 0)
+                    /*if (s1 == 0)
                         ret.containerPos = ret.newNumOfItemsBefore = 0;
                     else {
                         var d1;
@@ -613,14 +614,24 @@
                         }
                         if (items.length == itemsToDisplay)
                             ib = 0;
-                        /*if ((d1 - e1.containerSize) >= actualScrollArea) {
-                            ib += 1;
-                            d1 -= itemSize;
-                        }*/
+                        //if ((d1 - e1.containerSize) >= actualScrollArea) {
+                        //    ib += 1;
+                        //    d1 -= itemSize;
+                        //}
                         ret.containerPosRelative = d1;
                         ret.containerPos = s1;
                         ret.newNumOfItemsBefore = ib;
-                    }
+                    }*/
+                    var pos = s1;
+                    var h = itemSize;
+                    var H = e1.containerSize;
+                    var start = parseInt(pos / h); start = start != 0 ? start - 1 : start;
+                    var end = parseInt((pos + H) / h); end = end < (items.length - 1) ? end + 1 : end;
+                    //return { start: start, end: end };
+                    ret.containerPosRelative = (pos - start  * itemSize);
+                    ret.containerPos = s1;
+                    ret.newNumOfItemsBefore = start;
+                    ret.end = end;
                     return ret;
                 }
             };
@@ -637,6 +648,7 @@
                 var pos = virtualScroll.fromScrollerPos(newPos, e1.containerSize, virtualScrollArea);
                 e1.containerPos = pos.containerPos;
                 e1.newNumOfItemsBefore = pos.newNumOfItemsBefore;
+                e1.end = pos.end;
 
                 hideShowElements(null, e1);
                 this[scrollPos] = pos.containerPosRelative;
@@ -705,15 +717,18 @@
                     numOfItemsBefore = val;
                 else
                     numOfItemsBefore = 0;
-                //console.log('setNumberOfItemsBefore ' + numOfItemsBefore);
-                if (numOfItemsBefore > 0) {
-                    hideItems/*items.filter*/(':lt(' + numOfItemsBefore + ')');//.addClass('scrolledOutOfView');
-                    ret = showItems/*items.filter*/(':gt(' + (numOfItemsBefore - 1) + '):lt(' + itemsToDisplay + ')');//.removeClass('scrolledOutOfView');
-                    hideItems/*items.filter*/(':gt(' + (numOfItemsBefore + itemsToDisplay - 1) + ')')//.addClass('scrolledOutOfView');
+                ////console.log('setNumberOfItemsBefore ' + numOfItemsBefore);
+                var start = numOfItemsBefore; //parseInt(vis.numOfItemsBefore);
+                var end = e.end;
+                var itemsToDisplay = e.end - numOfItemsBefore + 1;//vis.itemsToDisplay;
+                if (start > 0) {
+                    hideItems(':lt(' + start + ')');
+                    ret = showItems(':gt(' + (start - 1) + '):lt(' + itemsToDisplay + ')');
+                    hideItems(':gt(' + end/*start + itemsToDisplay - 1*/ + ')');
                 }
                 else {
-                    ret = showItems/*items.filter*/(':lt(' + itemsToDisplay + ')')//.removeClass('scrolledOutOfView');
-                    hideItems/*items.filter*/(':gt(' + (itemsToDisplay - 1) + ')')//.addClass('scrolledOutOfView');
+                    ret = showItems(':lt(' + (end + 1) + ')');
+                    hideItems(':gt(' + end + ')');
                 }
                 return ret;
                 //setNumberOfItemsBefore(parseInt((e.scrollerPos / e.scrollerSize) * (items.length - itemsToDisplay)) - 1); //parseInt(((containerPos + 1) / (itemHeight + 1)));
