@@ -588,9 +588,9 @@
                 fromScrollerPos: function (pos, containerSize, virtualScrollArea) {
                     var s1 = this.posFromRatio(pos / maxPos, containerSize, virtualScrollArea);
                     //var s1 = parseInt((pos / maxPos) * (virtualScrollArea - containerSize));
-                    return this.fromVirtualPos(s1);
+                    return this.fromVirtualPos(s1, containerSize);
                 },
-                fromVirtualPos: function (s1) {
+                fromVirtualPos: function (s1, containerSize) {
                     var ret = {};
                     /*if (s1 == 0)
                         ret.containerPos = ret.newNumOfItemsBefore = 0;
@@ -624,9 +624,10 @@
                     }*/
                     var pos = s1;
                     var h = itemSize;
-                    var H = e1.containerSize;
+                    var H = containerSize;
                     var start = parseInt(pos / h); start = start != 0 ? start - 1 : start;
                     var end = parseInt((pos + H) / h); end = end < (items.length - 1) ? end + 1 : end;
+                    itemsToDisplay = end - start + 1;
                     //return { start: start, end: end };
                     ret.containerPosRelative = (pos - start  * itemSize);
                     ret.containerPos = s1;
