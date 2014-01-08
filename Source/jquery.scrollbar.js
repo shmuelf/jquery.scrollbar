@@ -189,6 +189,11 @@
                 updateScroller();
             };
 
+            that.isVirtual = isVirtual;
+            function isVirtual() {
+                return options.virtualScroll;
+            }
+
             function scrollScroller(pos, isStep) {
                 maxPos = $scrollerWraper[size]() - $slider[size]();
                 if (isStep)
@@ -364,6 +369,11 @@
                 }
                 return scrollContainerAndScroller(pos, !moveTo);
             }
+            this.scrollTop = function (val) {
+                return val
+                     ? Step(val, true)
+                     : currentScrollPos();
+            };
 
             function containerMouseWhealEnd() {
                 $container.trigger('scrollend.scrollbar');
@@ -449,7 +459,7 @@
                 itemSize,
                 numOfItemsBefore = 0,
                 itemsToDisplay,
-                scrollSpace = 20,
+                //scrollSpace = 20,
                 prevState;
 
             that.currentScrollPos = currentScrollPos;
@@ -460,6 +470,10 @@
             that.findItem = findItem;
             function findItem(point) {
                 return numOfItemsBefore + parseInt((container[scrollPos] + point) / itemSize);
+            }
+            that.virtualPos = virtualPos;
+            function virtualPos(point) {
+                return numOfItemsBefore * itemSize + point; //parseInt((container[scrollPos] + point) / itemSize);
             }
             function currentScrollRatio() {
                 //var pos = $container[scrollPos]() / (container[scrollSize] - $container[size]());
@@ -522,13 +536,16 @@
                 }
             }
 
-            function setItemsToDisplay(_itemSize) {
-                scrollSpace = _itemSize;
+            function setItemsToDisplay(/*_itemSize*/) {
+                //scrollSpace = _itemSize;
                 /*itemsToDisplay = parseInt($container[size]() / itemSize);
                 if ((itemsToDisplay * itemSize - $container[size]()) < itemSize * 2)
                     itemsToDisplay = itemsToDisplay + 2;*/
-                var tmp = (2 * itemSize + $container[size]()) / itemSize;
+
+                //var tmp = (2 * itemSize + $container[size]()) / itemSize;
+                var tmp = (2 * $container[size]()) / itemSize;
                 itemsToDisplay = (tmp - parseInt(tmp)) > 0 ? parseInt(tmp) + 1 : tmp;
+
                 /*var L = (items ? items : $container.find(itemsFilter)).length;
                 if (itemsToDisplay > L) itemsToDisplay = L;*/
             }
@@ -575,7 +592,7 @@
                 if (visItems.length) {
                     var _itemSize = visItems.last()[size]();
                     itemSize = (visItems.last().offset()[dir] + _itemSize - visItems.first().offset()[dir]) / visItems.length;
-                    setItemsToDisplay(itemSize);
+                    setItemsToDisplay(); //(itemSize)
                 }
             }
 
@@ -625,8 +642,10 @@
                     var pos = s1;
                     var h = itemSize;
                     var H = containerSize;
-                    var start = parseInt(pos / h); start = start != 0 ? start - 1 : start;
-                    var end = parseInt((pos + H) / h); end = end < (items.length - 1) ? end + 1 : end;
+                    /*var start = parseInt(pos / h); start = start != 0 ? start - 1 : start;
+                    var end = parseInt((pos + H) / h); end = end < (items.length - 1) ? end + 1 : end;*/
+                    var start = parseInt((pos - H * 0.5) / h); start = start < 0 ? 0 : start;
+                    var end = parseInt((pos + H + H * 0.5) / h); end = end < (items.length - 1) ? end : items.length - 1;
                     itemsToDisplay = end - start + 1;
                     //return { start: start, end: end };
                     ret.containerPosRelative = (pos - start  * itemSize);
@@ -707,9 +726,9 @@
                 /*else
                     e = getScrollerPositions();*/
 
-                if (prevState && prevState.newNumOfItemsBefore == e.newNumOfItemsBefore && prevState.selector == itemsFilter && prevState.itemsToDisplay == itemsToDisplay && prevState.scrollerSize == e.scrollerSize)
+                    if (prevState && prevState.end == e.end && prevState.newNumOfItemsBefore == e.newNumOfItemsBefore && prevState.selector == itemsFilter && prevState.itemsToDisplay == itemsToDisplay && prevState.scrollerSize == e.scrollerSize)
                     return;
-                prevState = { newNumOfItemsBefore: e.newNumOfItemsBefore, selector: itemsFilter, itemsToDisplay: itemsToDisplay, scrollerSize: e.scrollerSize };
+                prevState = { newNumOfItemsBefore: e.newNumOfItemsBefore, selector: itemsFilter, itemsToDisplay: itemsToDisplay, end: e.end, scrollerSize: e.scrollerSize };
 
                 var val = e.newNumOfItemsBefore;
                 var ret;
@@ -835,3 +854,18 @@ if (typeof onEventEnd == 'undefined')
             }
         }
     };
+
+jQuery.fn.rScrollTop = jQuery.fn.scrollTop;
+jQuery.fn.scrollTop = function (value) {
+    var $this = $(this);
+    var scrollbar = $this.data('scrollbary');
+    if (scrollbar && scrollbar.isVirtual()) {
+        if (value) {
+            scrollbar.Step(value, true);
+            return $this;
+        }
+        else
+            return scrollbar.currentScrollPos();
+    }
+    return value !== undefined ? this.rScrollTop(value) : this.rScrollTop();
+};
