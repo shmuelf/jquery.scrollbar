@@ -469,12 +469,27 @@
             // returns item index out of point (actual x or y coordinate (accordin to dir of the scrollbar) on the container)
             that.findItem = findItem;
             function findItem(point) {
-                return numOfItemsBefore + parseInt((container[scrollPos] + point) / itemSize);
+                return numOfItemsBefore + (container[scrollPos] + point) / itemSize;
             }
             that.virtualPos = virtualPos;
-            function virtualPos(point) {
-                return numOfItemsBefore * itemSize + point; //parseInt((container[scrollPos] + point) / itemSize);
+            function virtualPos(point, onWrapper) {
+				var ret = numOfItemsBefore * itemSize + point; //parseInt((container[scrollPos] + point) / itemSize);
+				if (onWrapper)
+					ret += container[scrollPos]
+				return ret;
             }
+			that.yRelativeToItem = yRelativeToItem;
+			function yRelativeToItem(point) {
+				var item = findItem(point);
+				return (item - parseInt(item)) * itemSize;
+			}
+			that.itemPosition = itemPosition;
+			function itemPosition(item) {
+				return item * itemSize;
+			}
+			function currentItem() {
+				return findItem(container[scrollPos]);
+			}
             function currentScrollRatio() {
                 //var pos = $container[scrollPos]() / (container[scrollSize] - $container[size]());
                 var pos;
